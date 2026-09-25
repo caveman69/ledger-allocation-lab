@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/LedgerAllocationLab.Core/LedgerAllocationLab.Core.csproj" />
+    <Project Path="src/LedgerAllocationLab.Data/LedgerAllocationLab.Data.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LedgerAllocationLab.Core.Tests/LedgerAllocationLab.Core.Tests.csproj" />
+    <Project Path="tests/LedgerAllocationLab.Data.Tests/LedgerAllocationLab.Data.Tests.csproj" />
+  </Folder>
+</Solution>

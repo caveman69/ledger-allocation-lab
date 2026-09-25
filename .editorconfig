@@ -1,0 +1,78 @@
+# formal style enforcement
+root = true
+
+[*]
+indent_style = space
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Windows script overrides
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# Optional: Force PowerShell to use CRLF as well
+[*.{ps1,psm1}]
+end_of_line = crlf
+
+[*.sql]
+end_of_line = crlf
+
+[*.{cs,csx,vb,vbx}]
+indent_size = 4
+
+[*.cs]
+# -- Brace placement (Allman) -------------------------------------
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+# -- Always-braces on if / else / for / while / using / lock -----
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0011.severity = warning
+
+# -- Sort + remove unused usings ---------------------------------
+dotnet_diagnostic.IDE0005.severity = warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# -- Explicit accessibility modifiers ----------------------------
+dotnet_style_require_accessibility_modifiers = always:warning
+dotnet_diagnostic.IDE0040.severity = warning
+
+# -- Expression-bodied members (only when single-line) -----------
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+csharp_style_expression_bodied_constructors = false:silent
+csharp_style_expression_bodied_operators = when_on_single_line:silent
+csharp_style_expression_bodied_properties = when_on_single_line:silent
+csharp_style_expression_bodied_indexers = when_on_single_line:silent
+csharp_style_expression_bodied_accessors = when_on_single_line:silent
+
+# -- Blank-line between members ----------------------------------
+dotnet_diagnostic.IDE2000.severity = warning
+
+# -- File-scoped namespaces (already convention; promote to rule) -
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0161.severity = warning
+
+# Standard formatting for Razor and Web files
+[*.{razor,cshtml,html,css}]
+indent_style = space
+indent_size = 4
+
+[*.{xml,csproj,props,targets,config}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{ts,tsx,js,jsx,vue}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
