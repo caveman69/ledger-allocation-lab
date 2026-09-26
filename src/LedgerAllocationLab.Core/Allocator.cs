@@ -2,6 +2,21 @@ namespace LedgerAllocationLab.Core;
 
 public static class Allocator
 {
+    /// <summary>
+    /// This method allocates a total amount of cents among a list of shares based on their weights. It returns a list of tuples containing the key and the allocated cents for each share.
+    /// Example: var allocations = Allocator.Allocate(amountCents, rates.Select(r => (r.DistrictId, r.Rate)).OrderBy(r => r.DistrictId).ToList())
+    /// </summary>
+    /// <typeparam name="TKey"></typeparam>
+    /// <param name="totalCents"></param>
+    /// <param name="shares"></param>
+    /// <returns></returns>
+    public static IReadOnlyList<(TKey Key, long Cents)> Allocate<TKey>(
+    long totalCents, IReadOnlyList<(TKey Key, decimal Weight)> shares)
+    {
+        long[] cents = Allocate(totalCents, shares.Select(s => s.Weight).ToArray());
+        return shares.Select((s, i) => (s.Key, cents[i])).ToList();
+    }
+
     public static long[] Allocate(long totalCents, IReadOnlyList<decimal> weights)
     {
         ArgumentNullException.ThrowIfNull(weights);
