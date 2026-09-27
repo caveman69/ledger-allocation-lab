@@ -206,6 +206,7 @@ Data.Tests (Docker SQL Server; skipped with a clear message if `LEDGERLAB_SQL` i
 - Posting writes a payment and allocations that sum to it, in one transaction.
 - Posting twice with the same idempotency key writes one payment.
 
+- Posting the same idempotency key concurrently writes one payment, and every caller gets it back.
 - A failure mid-post leaves nothing behind.
 - Update or delete on a posted row is refused.
 - Reversal mirrors the original exactly; net for the pair is zero per district.

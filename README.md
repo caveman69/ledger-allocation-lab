@@ -4,8 +4,7 @@ A small .NET 10 lab for splitting payments exactly across the parties that own t
 append-only, and reconciling two reports built from the same data. The worked example is property
 tax collection, where one payment is owed to several taxing districts.
 
-Synthetic data only. See [docs/SPEC.md](docs/SPEC.md) for the design and
-[docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) for how each piece works.
+Synthetic data only. See [docs/SPEC.md](docs/SPEC.md) for the design
 
 ## Stack
 
