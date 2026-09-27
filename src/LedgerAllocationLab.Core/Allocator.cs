@@ -53,7 +53,8 @@ public static class Allocator
         var exact = weights.Select(w => (totalCents * w) / sumWeight).ToArray();
         var result = exact.Select(e => (long)Math.Floor(e)).ToArray();
         var remainder = totalCents - result.Sum();
-        foreach (var i in Enumerable.Range(0, weights.Count).OrderByDescending(j => exact[j] - result[j]).ThenBy(j => j).Take((int)remainder))
+        var allocOrdering = Enumerable.Range(0, weights.Count).OrderByDescending(j => exact[j] - result[j]).ThenBy(j => j);
+        foreach (var i in allocOrdering.Take((int)remainder))
         {
             result[i]++;
         }

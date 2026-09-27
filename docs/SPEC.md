@@ -177,8 +177,7 @@ commented as the counter-example. It ignores the stored rows and recalculates ea
 from rates on the fly, and it carries three classic mistakes:
 - rounds each line (`ROUND(amount * share, 0)`) instead of using the stored split,
 - filters on `ReceivedUtc BETWEEN @start AND @end` instead of `BusinessDate`,
-- converts with a fixed offset that assumes DST, so evening payments shift a day.
-
+- converts with a fixed offset that assumes DST (UTC-6), so payments between 11:00 PM and midnight local land on the next business date.
 ## 10. Reconciliation (Data)
 
 `ReconcileAsync(startDate, endDate)` joins Report A and Report B by district and business date and
@@ -201,12 +200,12 @@ Core.Tests (no database):
   and all-zero weights).
 - Allocator invariant sweep: a fixed-seed `Random` generating several thousand (total, weights)
   cases; assert every invariant in section 6. Fixed seed so a failure reproduces.
-- Business date: 11:30 PM local on Sept 30 is Sept 30; 12:30 AM local on Oct 1 is Oct 1; the same
-  instants read with the DST-assuming offset land on the wrong day.
+- Business date: 11:30 PM local on Sept 30 is Sept 30; 12:30 AM local on Oct 1 is Oct 1. Read with the DST-assuming offset (UTC-6), the 11:30 PM instant lands on Oct 1 and the 12:30 AM instant is unaffected. A fixed offset that is one hour off only misplaces the last hour of the local day.
 
 Data.Tests (Docker SQL Server; skipped with a clear message if `LEDGERLAB_SQL` is not set):
 - Posting writes a payment and allocations that sum to it, in one transaction.
 - Posting twice with the same idempotency key writes one payment.
+
 - A failure mid-post leaves nothing behind.
 - Update or delete on a posted row is refused.
 - Reversal mirrors the original exactly; net for the pair is zero per district.
