@@ -7,8 +7,10 @@
     <File Path="docker-compose.yml" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/LedgerAllocationLab.Migrator/LedgerAllocationLab.Migrator.csproj" Id="66d47fad-ee8e-4a2d-80de-d7657512860a" />
     <Project Path="src/LedgerAllocationLab.Core/LedgerAllocationLab.Core.csproj" />
     <Project Path="src/LedgerAllocationLab.Data/LedgerAllocationLab.Data.csproj" />
+    <Project Path="src/LedgerAllocationLab.Database/LedgerAllocationLab.Database.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/LedgerAllocationLab.Core.Tests/LedgerAllocationLab.Core.Tests.csproj" />

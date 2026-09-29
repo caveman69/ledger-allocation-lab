@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\LedgerAllocationLab.Database\LedgerAllocationLab.Database.csproj" />
     <ProjectReference Include="..\..\src\LedgerAllocationLab.Data\LedgerAllocationLab.Data.csproj" />
   </ItemGroup>
 

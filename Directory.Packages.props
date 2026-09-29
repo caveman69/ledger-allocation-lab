@@ -6,7 +6,8 @@
     <!-- Data access -->
     <PackageVersion Include="Dapper" Version="2.1.35" />
     <PackageVersion Include="Dapper.Contrib" Version="2.0.78" />
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageVersion Include="dbup-sqlserver" Version="7.2.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.4" />
     <!-- Tests -->
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />

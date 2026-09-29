@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <EmbeddedResource Include="Scripts\**\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="dbup-sqlserver" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Scripts\04_PostDeployment\001_Functions\" />
+    <Folder Include="Scripts\04_PostDeployment\002_Views\" />
+    <Folder Include="Scripts\04_PostDeployment\003_Procedures\" />
+  </ItemGroup>
+
+</Project>

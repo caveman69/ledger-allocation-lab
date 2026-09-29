@@ -9,7 +9,8 @@ using Xunit.Abstractions;
 
 namespace LedgerAllocationLab.Data.Tests;
 
-public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase(output)
+[Collection(LedgerDatabaseCollection.Name)]
+public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHelper output) : LedgerDataTestsBase(db, output)
 {
     
     [SqlFact]
@@ -269,10 +270,11 @@ public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase
         var (parcelId, _) = await SeedParcelAsync(TaxYear, 1m);
         var key = Guid.NewGuid();
         await using var conn = await OpenAsync();
+        //Unbalanced on purpose, so it's dated 1900-01-01, outside every report and control-total range.
         var paymentId = await conn.ExecuteScalarAsync<long>(
             $"""
             INSERT INTO {PaymentTable} (IdempotencyKey, ParcelId, TaxYear, AmountCents, ReceivedOnUtc, BusinessDate)
-            VALUES (@key, @parcelId, @TaxYear, 100, SYSUTCDATETIME(), CAST(SYSUTCDATETIME() AS DATE));
+            VALUES (@key, @parcelId, @TaxYear, 100, '1900-01-01T19:00:00', '1900-01-01');
             SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
             """, new { key, parcelId, TaxYear });
 
@@ -332,14 +334,14 @@ public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase
         await Assert.ThrowsAsync<SqlException>(() => AddRatesAsync(parcelId, districtIds, TaxYear, 2m));
     }
 
-    private static async Task<int> CountPaymentsAsync(Guid key)
+    private async Task<int> CountPaymentsAsync(Guid key)
     {
         await using var conn = await OpenAsync();
         return await conn.ExecuteScalarAsync<int>(
             $"SELECT COUNT(*) FROM {PaymentTable} WHERE IdempotencyKey = @key", new { key });
     }
 
-    private static async Task<Dictionary<int, long>> GetAllocationsAsync(long paymentId)
+    private async Task<Dictionary<int, long>> GetAllocationsAsync(long paymentId)
     {
         await using var conn = await OpenAsync();
         var rows = await conn.QueryAsync<(int DistrictId, long AmountCents)>(

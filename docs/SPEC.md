@@ -59,11 +59,12 @@ These rules apply to every part of the code.
 LedgerAllocationLab.slnx
 Directory.Build.props, Directory.Packages.props, global.json
 docker-compose.yml, .env.example
-db/                                     numbered SQL scripts, run in order
 src/LedgerAllocationLab.Core            pure domain: allocator, money, business-date clock
 src/LedgerAllocationLab.Data            Dapper + SQL Server: posting, reports, reconciliation
+src/LedgerAllocationLab.Database        SQL scripts (embedded) + LedgerMigrator (DbUp)
+src/LedgerAllocationLab.Migrator        console app: runs LedgerMigrator against LEDGERLAB_SQL
 tests/LedgerAllocationLab.Core.Tests    fast unit tests, no database
-tests/LedgerAllocationLab.Data.Tests    integration tests against the Docker SQL Server
+tests/LedgerAllocationLab.Data.Tests    integration tests against a throwaway database per run
 docs/
   SPEC.md (this file), WALKTHROUGH.md
 ```
@@ -133,7 +134,20 @@ Rules and edge cases:
 parcel, the payments, and each payment's split by district. The database itself refuses to change
 or delete a recorded payment or its split, and refuses to reverse the same payment twice.
 
-`db/` holds numbered scripts (CRLF, per `.gitattributes`). Sketch:
+The schema is built by DbUp from SQL scripts embedded in `src/LedgerAllocationLab.Database`
+(CRLF, per `.gitattributes`). `LedgerMigrator.Run` creates the database if needed, then runs two
+passes:
+- `Scripts/02_Migrations`: tables, constraints and indexes. Journaled in DbUp's `SchemaVersions`
+  table, so each script runs exactly once, each in its own transaction. Files are named
+  `yyyyMMdd_nnn_description.sql` and run in name order. A schema change is always a new script,
+  never an edit to one that has already run.
+- `Scripts/04_PostDeployment`: objects that can be safely recreated (triggers now; the Report B
+  function later). Every script is `CREATE OR ALTER` and runs on every deploy, so changing one
+  means editing its file. Subfolders (`001_Functions`, `002_Views`, `003_Procedures`,
+  `004_Triggers`) set the order.
+
+The same migrator is used by the console app, by the Data.Tests fixture, and later by the optional
+Blazor app. Sketch of the tables:
 
 ```sql
 CREATE TABLE dbo.Districts (
@@ -299,7 +313,11 @@ Core.Tests (no database):
   instant is unaffected. A fixed offset that is one hour off only misplaces the last hour of the
   local day.
 
-Data.Tests (Docker SQL Server; skipped with a clear message if `LEDGERLAB_SQL` is not set):
+Data.Tests (Docker SQL Server; skipped with a clear message if `LEDGERLAB_SQL` is not set). A
+shared xUnit collection fixture creates a fresh `LedgerLab_Test_...` database for each run, builds
+it with `LedgerMigrator`, and drops it when the run ends (`LEDGERLAB_KEEP_TEST_DB=1` keeps it for
+inspection). Rows inserted directly, to prove the triggers work, are dated 1900-01-01 so they fall
+outside every report and control-total range.
 - Posting writes a payment and allocations that sum to it, in one transaction.
 - Posting twice with the same idempotency key writes one payment.
 - Posting the same idempotency key concurrently writes one payment, and every caller gets it back.

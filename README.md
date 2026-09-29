@@ -59,26 +59,8 @@ docker compose up -d --wait
 
 `--wait` returns once the container's health check passes.
 
-**2. Create the database and schema.** The `db/` folder is mounted into the container, and these
-commands read the password from the container's own environment, so you don't type it.
-
-```bash
-docker exec ledgerlab-sql bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b -i /db/000_create_database.sql'
-docker exec ledgerlab-sql bash -c 'for f in /db/001_*.sql /db/002_*.sql; do /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b -d LedgerLab -i "$f" || exit 1; done'
-```
-
-The same commands work in bash and PowerShell. The scripts aren't rerunnable. To start over, see
-[Resetting the database](#resetting-the-database).
-
-**3. Build and test.**
-
-```bash
-dotnet build
-dotnet test
-```
-
-Core.Tests need nothing else. Data.Tests run against the Docker SQL Server and are skipped, with a
-message, unless `LEDGERLAB_SQL` is set to the lab's connection string:
+**2. Set the connection string.** The migrator and the Data.Tests both read `LEDGERLAB_SQL`. Use
+the password from your `.env`:
 
 ```bash
 # bash
@@ -90,8 +72,34 @@ export LEDGERLAB_SQL="Server=127.0.0.1,14333;Database=LedgerLab;User Id=sa;Passw
 $env:LEDGERLAB_SQL = "Server=127.0.0.1,14333;Database=LedgerLab;User Id=sa;Password=<your password>;TrustServerCertificate=True"
 ```
 
-To avoid setting it in every shell, create `test.local.runsettings` in the repository root.
-`Directory.Build.props` picks it up automatically, and it's git-ignored:
+**3. Create the database and schema.**
+
+```bash
+dotnet run --project src/LedgerAllocationLab.Migrator
+```
+
+The migrator uses [DbUp](https://dbup.readthedocs.io/). It creates the `LedgerLab` database if it
+doesn't exist, then applies the scripts in `src/LedgerAllocationLab.Database/Scripts`. It's safe to
+run again: DbUp records which migration scripts it has applied and only runs new ones. It exits
+with a non-zero code if a script fails.
+
+**4. Build and test.**
+
+```bash
+dotnet build
+dotnet test
+```
+
+Core.Tests need nothing else. Data.Tests are skipped, with a message, unless `LEDGERLAB_SQL` is
+set. They don't touch the `LedgerLab` database. Each test run creates its own
+`LedgerLab_Test_...` database on the same server, builds it with the same migrator, and drops it
+when the run ends. To keep it for inspection in a SQL client, set `LEDGERLAB_KEEP_TEST_DB=1`
+before running the tests. Leftover test databases more than an hour old are removed at the start
+of the next run.
+
+To avoid setting `LEDGERLAB_SQL` in every shell for the tests, create `test.local.runsettings` in
+the repository root. `Directory.Build.props` picks it up automatically, and it's git-ignored. It
+applies to `dotnet test` only, not to the migrator:
 
 ```xml
 <RunSettings>
@@ -105,8 +113,8 @@ To avoid setting it in every shell, create `test.local.runsettings` in the repos
 
 ## Resetting the database
 
-The payment tables are append-only, and the tests never delete what they write. To get a clean
-database, remove the container and its volume, then repeat steps 1 and 2:
+The payment tables are append-only, so rows can't be deleted. To get a clean `LedgerLab`
+database, remove the container and its volume, then repeat steps 1 and 3:
 
 ```bash
 docker compose down -v
@@ -121,10 +129,11 @@ to IPv4 loopback only, and on Windows `localhost` can resolve to IPv6 first and 
 ## Layout
 
 ```
-db/                                   numbered SQL scripts, run in order
 docs/SPEC.md                          the design
 src/LedgerAllocationLab.Core          allocator and business-date clock, no database
 src/LedgerAllocationLab.Data          Dapper and SQL Server: posting, reports, reconciliation
+src/LedgerAllocationLab.Database      schema scripts and the DbUp migrator library
+src/LedgerAllocationLab.Migrator      console app that runs the migrations
 tests/LedgerAllocationLab.Core.Tests  fast unit tests
-tests/LedgerAllocationLab.Data.Tests  integration tests against the Docker SQL Server
+tests/LedgerAllocationLab.Data.Tests  integration tests against a throwaway database per run
 ```

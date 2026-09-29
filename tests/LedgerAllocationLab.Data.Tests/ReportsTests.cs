@@ -6,7 +6,8 @@ using Xunit.Abstractions;
 
 namespace LedgerAllocationLab.Data.Tests;
 
-public class ReportsTests(ITestOutputHelper output) : LedgerDataTestsBase(output)
+[Collection(LedgerDatabaseCollection.Name)]
+public class ReportsTests(LedgerDatabaseMigratorFixture db, ITestOutputHelper output) : LedgerDataTestsBase(db, output)
 {
     [SqlFact]
     public async Task ReportA_SumsStoredAllocations_ByBusinessDateAndDistrict()

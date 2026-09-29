@@ -1,5 +1,5 @@
-CREATE TRIGGER TR_Payments_DenyUpdateDelete
-ON dbo.Payments
+CREATE OR ALTER TRIGGER TR_PaymentAllocations_DenyUpdateDelete
+ON dbo.PaymentAllocations
 INSTEAD OF UPDATE, DELETE
 AS
 BEGIN

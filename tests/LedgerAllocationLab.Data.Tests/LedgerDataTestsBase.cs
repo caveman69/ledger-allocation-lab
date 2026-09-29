@@ -16,21 +16,26 @@ public class LedgerDataTestsBase : IDisposable
     protected const string RateTable = "dbo.ParcelDistrictRates";
     protected const string PaymentTable = "dbo.Payments";
     protected const string AllocationTable = "dbo.PaymentAllocations";
-
     protected const short TaxYear = 2026;
-
-    protected static string ConnectionString => Environment.GetEnvironmentVariable(SqlFactAttribute.EnvVar)!;
     protected readonly ServiceProvider _provider;
     protected readonly List<IServiceScope> _scopes = [];
     protected readonly Lock _scopesLock = new();
 
-    protected static ServiceProvider BuildProvider(ITestOutputHelper output)
+    protected string ConnectionString { get; }
+
+    public LedgerDataTestsBase(LedgerDatabaseMigratorFixture db, ITestOutputHelper output)
+    {
+        ConnectionString = db.ConnectionString;
+        _provider = BuildProvider(ConnectionString, output);
+    }
+
+    protected static ServiceProvider BuildProvider(string connectionString, ITestOutputHelper output)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 // Use whatever key LedgerLabDapperDbContext reads.
-                ["LedgerLabDb:ConnectionString"] = ConnectionString,
+                ["LedgerLabDb:ConnectionString"] = connectionString,
             })
             .Build();
 
@@ -51,17 +56,17 @@ public class LedgerDataTestsBase : IDisposable
 
     // ===== Helpers: seed and read through SQL, never through the code under test =====
 
-    protected static async Task<SqlConnection> OpenAsync()
+    protected async Task<SqlConnection> OpenAsync()
     {
         var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync();
         return conn;
     }
 
-    // Tables are append-only, so tests never clean up. Random IDs keep runs from colliding.
+    // Random IDs keep runs from colliding.
     protected static int NextIdBlock() => Random.Shared.Next(100_000_000, 2_000_000_000);
 
-    protected static async Task<(int ParcelId, int[] DistrictIds)> SeedParcelAsync(short taxYear, params decimal[] rates)
+    protected async Task<(int ParcelId, int[] DistrictIds)> SeedParcelAsync(short taxYear, params decimal[] rates)
     {
         var parcelId = NextIdBlock();
         var districtIds = Enumerable.Range(NextIdBlock(), rates.Length).ToArray();
@@ -82,7 +87,7 @@ public class LedgerDataTestsBase : IDisposable
         return (parcelId, districtIds);
     }
 
-    protected static async Task AddRatesAsync(int parcelId, int[] districtIds, short taxYear, params decimal[] rates)
+    protected async Task AddRatesAsync(int parcelId, int[] districtIds, short taxYear, params decimal[] rates)
     {
         await using var conn = await OpenAsync();
         for (var i = rates.Length - 1; i >= 0; i--)
@@ -91,11 +96,6 @@ public class LedgerDataTestsBase : IDisposable
                 $"INSERT INTO {RateTable} (ParcelId, DistrictId, TaxYear, Rate) VALUES (@parcelId, @districtId, @taxYear, @rate)",
                 new { parcelId, districtId = districtIds[i], taxYear, rate = rates[i] });
         }
-    }
-
-    public LedgerDataTestsBase(ITestOutputHelper output)
-    {
-        _provider = BuildProvider(output);
     }
  
     // One scope per simulated request, same as a web request in production.
@@ -118,6 +118,7 @@ public class LedgerDataTestsBase : IDisposable
         {
             scope.Dispose();
         }
+        _provider.Dispose();
 
         GC.SuppressFinalize(this);
     }
