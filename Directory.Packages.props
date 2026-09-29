@@ -18,6 +18,5 @@
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
-    <PackageVersion Include="Z.Dapper.Plus" Version="9.3.5" />
   </ItemGroup>
 </Project>

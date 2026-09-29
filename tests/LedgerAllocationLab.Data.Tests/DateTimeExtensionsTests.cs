@@ -1,7 +1,7 @@
 using System.Globalization;
 using LedgerAllocationLab.Data.Extensions;
 
-namespace LedgerAllocationLab.Core.Tests;
+namespace LedgerAllocationLab.Data.Tests;
 
 public class DateTimeExtensionsTests
 {

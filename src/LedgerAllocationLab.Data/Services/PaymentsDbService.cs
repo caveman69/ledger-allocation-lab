@@ -8,14 +8,14 @@ using Microsoft.Extensions.Logging;
 
 namespace LedgerAllocationLab.Data.Services;
 
-public interface IPaymentsDbService : IDbReadService<Models.Payment, long>
+public interface IPaymentsDbService
 {
     public Task<Payment?> GetPaymentByIdempotencyKeyAsync(Guid idempotencyKey);
     public Task<Payment> PostPaymentAsync(Guid idempotencyKey, int parcelId, short taxYear, long amountCents, DateTime receivedUtc);
 
 }
 
-public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<Payment, long> baseDbService, IParcelDistrictRateService parcelDistrictRateService, ILogger<PaymentsDbService> logger) : IPaymentsDbService
+public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<Payment, long> baseDbService, IParcelDistrictRateService parcelDistrictRateService, ILogger<PaymentsDbService> logger) : DbServiceBase(context, logger), IPaymentsDbService
 {
     public Task<IEnumerable<Payment>> GetAllAsync() => baseDbService.GetAllAsync();
     public Task<Payment?> GetByIdAsync(long id) => baseDbService.GetByIdAsync(id);
@@ -28,6 +28,16 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<
 
         return result;
     }
+
+    /// <summary>
+    /// Posts a payment to the database, allocating it to districts based on parcel district rates. This method is idempotent and will return the existing payment if a payment with the same idempotency key already exists.
+    /// </summary>
+    /// <param name="idempotencyKey"></param>
+    /// <param name="parcelId"></param>
+    /// <param name="taxYear"></param>
+    /// <param name="amountCents"></param>
+    /// <param name="receivedOnUtc">Date the payment was received in UTC - this comes from the caller (a processor or a lockbox timestamp). BusinessDate is derived from it</param>
+    /// <returns></returns>
     public async Task<Payment> PostPaymentAsync(Guid idempotencyKey, int parcelId, short taxYear, long amountCents, DateTime receivedOnUtc)
     {
         logger.LogInformation("Posting payment with idempotencyKey: {IdempotencyKey}, parcelId: {ParcelId}, taxYear: {TaxYear}, amountCents: {AmountCents}, receivedOnUtc: {ReceivedOnUtc}", idempotencyKey, parcelId, taxYear, amountCents, receivedOnUtc);
@@ -67,14 +77,14 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<
             var allocs = await insertConn.InsertAsync(allocations, transaction);
 
             //commit transaction
-            transaction.Commit();
+            await transaction.CommitAsync();
         } catch (SqlException sqlEx)
         {
             if (new[] { 2627, 2601 }.Contains(sqlEx.Number))
             {
                 // Handle idempotency violation
                 logger.LogWarning("Idempotency violation occurred while posting payment with idempotencyKey: {IdempotencyKey} returning existing payment.", idempotencyKey);
-                transaction.Rollback();
+                await transaction.RollbackAsync();
                 var existingPayment = await GetPaymentByIdempotencyKeyAsync(idempotencyKey);
                 if (existingPayment != null)
                 {
@@ -84,13 +94,13 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<
                     logger.LogError("Idempotency violation occurred but no existing payment found for idempotencyKey: {IdempotencyKey}", idempotencyKey);
                 }
             }
-            transaction.Rollback();
+            await transaction.RollbackAsync();
             logger.LogError(sqlEx, "SQL error occurred while posting payment");
             throw;
         }
         catch (Exception ex)
         {
-            transaction.Rollback();
+            await transaction.RollbackAsync();
             logger.LogError(ex, "Error occurred while posting payment");
             throw;
         }

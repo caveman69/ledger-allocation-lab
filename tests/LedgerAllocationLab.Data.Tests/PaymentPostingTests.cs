@@ -9,18 +9,9 @@ using Xunit.Abstractions;
 
 namespace LedgerAllocationLab.Data.Tests;
 
-public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase(output), IDisposable
+public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase(output)
 {
-    public void Dispose()
-    {
-        foreach (var scope in _scopes)
-        {
-            scope.Dispose();
-        }
-
-        GC.SuppressFinalize(this);
-    }    
-
+    
     [SqlFact]
     public void Configuration_ReachesDbOptions()
     {

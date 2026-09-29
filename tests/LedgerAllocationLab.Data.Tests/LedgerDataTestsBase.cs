@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace LedgerAllocationLab.Data.Tests;
 
-public class LedgerDataTestsBase
+public class LedgerDataTestsBase : IDisposable
 {
     protected const string DistrictTable = "dbo.Districts";
     protected const string ParcelTable = "dbo.Parcels";
@@ -109,4 +109,18 @@ public class LedgerDataTestsBase
 
         return scope.ServiceProvider.GetRequiredService<IPaymentsDbService>();
     }
+
+    #region IDisposable Support - Cleanup
+
+    public void Dispose()
+    {
+        foreach (var scope in _scopes)
+        {
+            scope.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    #endregion
 }
