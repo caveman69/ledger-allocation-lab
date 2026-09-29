@@ -120,7 +120,7 @@ CREATE TABLE dbo.Parcels (
 );
 
 CREATE TABLE dbo.ParcelDistrictRates (
-    Id           BIGINT IDENTITY PRIMARY KEY    
+    Id           BIGINT IDENTITY PRIMARY KEY,    
     ParcelId     INT            NOT NULL REFERENCES dbo.Parcels(Id),
     DistrictId   INT            NOT NULL REFERENCES dbo.Districts(Id),
     TaxYear      SMALLINT       NOT NULL,
@@ -135,12 +135,12 @@ CREATE TABLE dbo.Payments (
     TaxYear          SMALLINT     NOT NULL,
     AmountCents      BIGINT       NOT NULL,          -- negative for a reversal
     ReversesPaymentId BIGINT      NULL REFERENCES dbo.Payments(Id),
-    ReceivedUtc      DATETIME2(3) NOT NULL,
+    ReceivedOnUtc    DATETIME2(3) NOT NULL,
     BusinessDate     DATE         NOT NULL,
     CONSTRAINT UQ_Payment_IdempotencyKey UNIQUE (IdempotencyKey)
 );
 
-CREATE TABLE dbo.PaymentAllocations 
+CREATE TABLE dbo.PaymentAllocations (
     Id           BIGINT NOT NULL IDENTITY PRIMARY KEY,
     PaymentId    BIGINT NOT NULL REFERENCES dbo.Payments(Id),
     DistrictId   INT    NOT NULL REFERENCES dbo.Districts(Id),
@@ -155,16 +155,16 @@ update is refused.
 
 ## 8. Posting (Data)
 
-`PostPaymentAsync(idempotencyKey, parcelId, taxYear, amountCents, receivedUtc)`:
+`PostPaymentAsync(idempotencyKey, parcelId, taxYear, amountCents, receivedOnUtc)`:
 1. Open one connection, begin one transaction.
-2. Compute `BusinessDate` from `receivedUtc` in the business time zone.
+2. Compute `BusinessDate` from `receivedOnUtc` in the business time zone.
 3. Insert `Payment`. If the idempotency key already exists, return the existing payment and write
    nothing (a double submit is a no-op, not an error).
 4. Load the parcel's rates for the tax year, call `Allocator.Allocate`, insert one
    `PaymentAllocation` row per district.
 5. Commit. Any failure rolls back everything: no payment without its allocations.
 
-`ReversePaymentAsync(idempotencyKey, paymentId, receivedUtc)`: posts a new `Payment` with the
+`ReversePaymentAsync(idempotencyKey, paymentId, receivedOnUtc)`: posts a new `Payment` with the
 negated amount and `ReversesPaymentId` set, and allocation rows that exactly mirror the original's.
 A payment can be reversed once.
 
@@ -177,11 +177,11 @@ grouped by district, for a business-date range, half-open.
 commented as the counter-example. It ignores the stored rows and recalculates each payment's share
 from rates on the fly, and it carries three classic mistakes:
 - rounds each line (`ROUND(amount * share, 0)`) instead of using the stored split,
-- filters on `ReceivedUtc BETWEEN @start AND @end` instead of `BusinessDate`,
+- filters on `ReceivedOnUtc BETWEEN @start AND @end` instead of `BusinessDate`,
 - converts with a fixed offset that assumes DST (UTC-6), so payments between 11:00 PM and midnight local land on the next business date.
 ## 10. Reconciliation (Data)
 
-`ReconcileAsync(startDate, endDate)` joins Report A and Report B by district and business date and
+`ReconcileAsync(startDate, endDateExclusive)` joins Report A and Report B by district and business date and
 returns every row where they differ, with:
 - the difference in cents,
 - payment counts on each side,
