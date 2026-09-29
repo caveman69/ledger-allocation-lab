@@ -1,5 +1,5 @@
 # Local SQL Server for the integration tests. Nothing here leaves your machine.
-# Usage (from app/):  copy .env.example .env, set a password, then  docker compose up -d
+# Usage (from the repository root): copy .env.example to .env, set a password, then docker compose up -d --wait
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -7,7 +7,7 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Developer"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in app/.env}"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}"
     ports:
       # Bound to IPv4 loopback only: reachable from this machine, not from the network.
       # Connect with 127.0.0.1,14333 (not localhost, which may resolve to IPv6 on Windows).

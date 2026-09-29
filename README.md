@@ -4,18 +4,28 @@ A small .NET 10 lab for splitting payments exactly across the parties that own t
 append-only, and reconciling two reports built from the same data. The worked example is property
 tax collection, where one payment is owed to several taxing districts.
 
+In plain terms: when a county collects a property tax payment, it passes that money on to the
+school district, the city, and other taxing districts. The split has to be exact to the cent, a
+recorded payment can never be quietly changed, and when two reports disagree, someone has to
+explain why. This lab builds and tests each of those pieces.
+
 Synthetic data only. See [docs/SPEC.md](docs/SPEC.md) for the design.
 
 ## What's in it
 
-- **Allocator** (`src/LedgerAllocationLab.Core`): splits a payment across districts by the
-  largest-remainder method, so the parts always add back to the total, to the cent.
-- **Business-date clock** (`src/LedgerAllocationLab.Core`): turns a UTC timestamp into a business
-  date in `America/Phoenix`, which has no daylight saving time.
-- **Posting** (`src/LedgerAllocationLab.Data`): one transaction per payment, idempotent on a
-  caller-supplied key, append-only. Triggers refuse updates and deletes on posted rows.
-- **Reports and reconciliation** (`src/LedgerAllocationLab.Data`): a correct report, a deliberately
-  defective one, and a reconciliation that finds and classifies every difference between them.
+- **Allocator** (`src/LedgerAllocationLab.Core`): splits a payment across districts so the parts
+  always add back to the total, to the cent. It rounds every share down, then hands the leftover
+  cents to the shares that lost the most in rounding (the largest-remainder method).
+- **Business-date clock** (`src/LedgerAllocationLab.Core`): decides which business day a payment
+  counts toward. It turns the UTC timestamp into a date in `America/Phoenix`, which has no
+  daylight saving time.
+- **Posting** (`src/LedgerAllocationLab.Data`): records a payment and its split together, or
+  nothing at all (one transaction). A repeat submission is recorded once (idempotent on a
+  caller-supplied key). Recorded payments are never changed or deleted (append-only), and database
+  triggers refuse any attempt to.
+- **Reports and reconciliation** (`src/LedgerAllocationLab.Data`): two reports of what each
+  district collected each day. One is correct, and one makes three common mistakes on purpose. A
+  reconciliation compares them and labels every difference as rounding, timing, or unexplained.
 
 ## Status
 
@@ -40,7 +50,7 @@ Synthetic data only. See [docs/SPEC.md](docs/SPEC.md) for the design.
 All commands run from the repository root.
 
 **1. Start SQL Server.** Copy the example environment file and set a strong password in `.env`
-(8+ characters with upper, lower, digit and symbol). `.env` is git-ignored.
+(8+ characters with uppercase, lowercase, digit, and symbol). `.env` is git-ignored.
 
 ```bash
 cp .env.example .env
