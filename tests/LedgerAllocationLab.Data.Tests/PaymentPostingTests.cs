@@ -1,67 +1,16 @@
 using System.Globalization;
 using Dapper;
 using LedgerAllocationLab.Core;
-using LedgerAllocationLab.Data.Extensions;
 using LedgerAllocationLab.Data.Services;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
 
 namespace LedgerAllocationLab.Data.Tests;
 
-public class PaymentPostingTests : IDisposable
+public class PaymentPostingTests(ITestOutputHelper output) : LedgerDataTestsBase(output), IDisposable
 {
-    private const string DistrictTable = "dbo.Districts";
-    private const string ParcelTable = "dbo.Parcels";
-    private const string RateTable = "dbo.ParcelDistrictRates";
-    private const string PaymentTable = "dbo.Payments";
-    private const string AllocationTable = "dbo.PaymentAllocations";
-
-    private const short TaxYear = 2026;
-
-    private static string ConnectionString => Environment.GetEnvironmentVariable(SqlFactAttribute.EnvVar)!;
-    private readonly ServiceProvider _provider;
-    private readonly List<IServiceScope> _scopes = [];
-    private readonly Lock _scopesLock = new();
-
-    private static ServiceProvider BuildProvider(ITestOutputHelper output)
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                // Use whatever key LedgerLabDapperDbContext reads.
-                ["LedgerLabDb:ConnectionString"] = ConnectionString,
-            })
-            .Build();
-
-        return new ServiceCollection()
-            .AddSingleton<IConfiguration>(configuration)
-            .AddLogging(builder => builder
-                .AddProvider(new XunitLoggerProvider(output))
-                .SetMinimumLevel(LogLevel.Debug))
-            .RegisterLedgerAllocationLabDataServices()
-            .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
-    }
-    public PaymentPostingTests(ITestOutputHelper output)
-    {
-        _provider = BuildProvider(output);
-    }
-
-    // One scope per simulated request, same as a web request in production.
-    private IPaymentsDbService CreateService()
-    {
-        var scope = _provider.CreateScope();
-        lock (_scopesLock)
-        {
-            _scopes.Add(scope);
-        }
-
-        return scope.ServiceProvider.GetRequiredService<IPaymentsDbService>();
-    }
-
     public void Dispose()
     {
         foreach (var scope in _scopes)
@@ -71,13 +20,6 @@ public class PaymentPostingTests : IDisposable
 
         GC.SuppressFinalize(this);
     }    
-
-    private static async Task<long> PostAsync(
-        IPaymentsDbService service, Guid key, int parcelId, long amountCents, DateTime receivedOnUtc, short taxYear = TaxYear)
-    {
-        var payment = await service.PostPaymentAsync(key, parcelId, taxYear, amountCents, receivedOnUtc);
-        return payment.Id;
-    }
 
     [SqlFact]
     public void Configuration_ReachesDbOptions()
@@ -397,50 +339,6 @@ public class PaymentPostingTests : IDisposable
         var (parcelId, districtIds) = await SeedParcelAsync(TaxYear, 1m);
 
         await Assert.ThrowsAsync<SqlException>(() => AddRatesAsync(parcelId, districtIds, TaxYear, 2m));
-    }
-
-    // ===== Helpers: seed and read through SQL, never through the code under test =====
-
-    private static async Task<SqlConnection> OpenAsync()
-    {
-        var conn = new SqlConnection(ConnectionString);
-        await conn.OpenAsync();
-        return conn;
-    }
-
-    // Tables are append-only, so tests never clean up. Random IDs keep runs from colliding.
-    private static int NextIdBlock() => Random.Shared.Next(100_000_000, 2_000_000_000);
-
-    private static async Task<(int ParcelId, int[] DistrictIds)> SeedParcelAsync(short taxYear, params decimal[] rates)
-    {
-        var parcelId = NextIdBlock();
-        var districtIds = Enumerable.Range(NextIdBlock(), rates.Length).ToArray();
-
-        await using var conn = await OpenAsync();
-
-        // Highest ID first, so insert order and DistrictId order disagree.
-        foreach (var districtId in districtIds.Reverse())
-        {
-            await conn.ExecuteAsync($"INSERT INTO {DistrictTable} (Id, Name) VALUES (@districtId, @name)",
-                new { districtId, name = $"Test district {districtId}" });
-        }
-
-        await conn.ExecuteAsync($"INSERT INTO {ParcelTable} (Id, ParcelNumber) VALUES (@parcelId, @number)",
-            new { parcelId, number = $"T{parcelId}" });
-
-        await AddRatesAsync(parcelId, districtIds, taxYear, rates);
-        return (parcelId, districtIds);
-    }
-
-    private static async Task AddRatesAsync(int parcelId, int[] districtIds, short taxYear, params decimal[] rates)
-    {
-        await using var conn = await OpenAsync();
-        for (var i = rates.Length - 1; i >= 0; i--)
-        {
-            await conn.ExecuteAsync(
-                $"INSERT INTO {RateTable} (ParcelId, DistrictId, TaxYear, Rate) VALUES (@parcelId, @districtId, @taxYear, @rate)",
-                new { parcelId, districtId = districtIds[i], taxYear, rate = rates[i] });
-        }
     }
 
     private static async Task<int> CountPaymentsAsync(Guid key)

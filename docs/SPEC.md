@@ -4,8 +4,7 @@ A small, test-first lab for one narrow class of problem: splitting money exactly
 parties that own it, and proving two reports built from the same data agree. The worked domain is
 property tax collection, where one payment on a parcel is owed to several taxing districts.
 
-Sized to be built in an afternoon (about 4 to 5 hours). Milestones are in priority order; each one
-is useful on its own if time runs out.
+Sized to be built in an a couple afternoons (about 4 to 5 hours each). Milestones are in priority order; each one is useful on its own if time runs out.
 
 ## 1. Goals
 
@@ -110,41 +109,43 @@ Rules and edge cases:
 `db/` holds numbered scripts (CRLF, per `.gitattributes`). Sketch:
 
 ```sql
-CREATE TABLE dbo.District (
-    DistrictId   INT           NOT NULL PRIMARY KEY,
+CREATE TABLE dbo.Districts (
+    Id   INT           NOT NULL PRIMARY KEY,
     Name         NVARCHAR(100) NOT NULL
 );
 
-CREATE TABLE dbo.Parcel (
-    ParcelId     INT          NOT NULL PRIMARY KEY,
+CREATE TABLE dbo.Parcels (
+    Id     INT          NOT NULL PRIMARY KEY,
     ParcelNumber VARCHAR(20)  NOT NULL UNIQUE
 );
 
-CREATE TABLE dbo.ParcelDistrictRate (
-    ParcelId     INT            NOT NULL REFERENCES dbo.Parcel,
-    DistrictId   INT            NOT NULL REFERENCES dbo.District,
+CREATE TABLE dbo.ParcelDistrictRates (
+    Id           BIGINT IDENTITY PRIMARY KEY    
+    ParcelId     INT            NOT NULL REFERENCES dbo.Parcels(Id),
+    DistrictId   INT            NOT NULL REFERENCES dbo.Districts(Id),
     TaxYear      SMALLINT       NOT NULL,
     Rate         DECIMAL(9, 6)  NOT NULL CHECK (Rate >= 0),
-    PRIMARY KEY (ParcelId, DistrictId, TaxYear)
+    CONSTRAINT UQ_ParcelId_DistrictId_TaxYear UNIQUE (ParcelId, DistrictId, TaxYear)
 );
 
-CREATE TABLE dbo.Payment (
-    PaymentId        BIGINT IDENTITY PRIMARY KEY,
+CREATE TABLE dbo.Payments (
+    Id        BIGINT IDENTITY PRIMARY KEY,
     IdempotencyKey   UNIQUEIDENTIFIER NOT NULL,
-    ParcelId         INT          NOT NULL REFERENCES dbo.Parcel,
+    ParcelId         INT          NOT NULL REFERENCES dbo.Parcels(Id),
     TaxYear          SMALLINT     NOT NULL,
     AmountCents      BIGINT       NOT NULL,          -- negative for a reversal
-    ReversesPaymentId BIGINT      NULL REFERENCES dbo.Payment,
+    ReversesPaymentId BIGINT      NULL REFERENCES dbo.Payments(Id),
     ReceivedUtc      DATETIME2(3) NOT NULL,
     BusinessDate     DATE         NOT NULL,
     CONSTRAINT UQ_Payment_IdempotencyKey UNIQUE (IdempotencyKey)
 );
 
-CREATE TABLE dbo.PaymentAllocation (
-    PaymentId    BIGINT NOT NULL REFERENCES dbo.Payment,
-    DistrictId   INT    NOT NULL REFERENCES dbo.District,
+CREATE TABLE dbo.PaymentAllocations 
+    Id           BIGINT NOT NULL IDENTITY PRIMARY KEY,
+    PaymentId    BIGINT NOT NULL REFERENCES dbo.Payments(Id),
+    DistrictId   INT    NOT NULL REFERENCES dbo.Districts(Id),
     AmountCents  BIGINT NOT NULL,
-    PRIMARY KEY (PaymentId, DistrictId)
+    CONSTRAINT UQ_PaymentId_DistrictId UNIQUE (PaymentId, DistrictId)
 );
 ```
 
@@ -218,15 +219,15 @@ Data.Tests (Docker SQL Server; skipped with a clear message if `LEDGERLAB_SQL` i
 
 | # | Milestone | Box | Done when |
 |---|---|---|---|
-| M1 | Allocator + tests | 45 min | Invariant sweep green. Stop here and it is still worth showing. |
-| M2 | Schema + posting + idempotency + append-only | 60 min | Data.Tests for posting green against Docker. |
-| M3 | Reports A and B + reconciliation | 60 min | Seeded scenario shows B drifting and every difference classified. |
+| M1 | Allocator + tests | 60 mn | Invariant sweep green. Stop here and it is still worth showing. |
+| M2 | Schema + posting + idempotency + append-only | 90 min | Data.Tests for posting green against Docker. |
+| M3 | Reports A and B + reconciliation | 90 min | Seeded scenario shows B drifting and every difference classified. |
 | M4 | Business-date clock + boundary tests | 45 min | Boundary tests green in both Core and Data. |
-| M5 | README + WALKTHROUGH | 30 min | Walkthrough sections written as each piece lands; 60-second answers by the author. |
+| M5 | README | 30 min | Description of the project. |
 | M6 | Optional: one Blazor Server page | 60 min | Shows the reconciliation for a date range. Only if M1 to M5 are done. |
 
 ## 13. Definition of done
 
 - `dotnet build` clean, no warnings from the editorconfig rules.
 - `dotnet test` green; Data.Tests green with Docker running.
-- WALKTHROUGH.md has a section per pattern with real file paths and line ranges.
+
