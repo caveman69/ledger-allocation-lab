@@ -2,6 +2,12 @@ using System.Text.RegularExpressions;
 
 namespace LedgerAllocationLab.Data.Exceptions;
 
+public static class  CustomSqlExceptions
+{
+    public const int PaymentsAppendOnlyViolation = 51000;
+    public const int PaymentAllocationsAppendOnlyViolation = 51001;
+}
+
 public static class LogTemplates
 {
     public const string IdempotencyKeyConflictExceptionTemplate = "Idempotency violation: {IdempotencyKey} maps to different payment existing/requested values: ParcelId {ExistingParcelId}/{ParcelId}, TaxYear: {ExistingTaxYear}/{TaxYear}, AmountCents: {ExistingAmountCents}/{AmountCents}.";

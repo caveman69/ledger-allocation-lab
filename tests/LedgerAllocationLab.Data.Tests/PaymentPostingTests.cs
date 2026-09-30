@@ -290,9 +290,10 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         var paymentId = await PostAsync(CreateService(), Guid.NewGuid(), parcelId, 700, DateTime.UtcNow);
 
         await using var conn = await OpenAsync();
-        await Assert.ThrowsAsync<SqlException>(() =>
+        var ex = await Assert.ThrowsAsync<SqlException>(() =>
             conn.ExecuteAsync($"UPDATE {PaymentTable} SET AmountCents = 1 WHERE Id = @paymentId", new { paymentId }));
 
+        Assert.Equal(CustomSqlExceptions.PaymentsAppendOnlyViolation, ex.Number);
         Assert.Equal(700, await conn.ExecuteScalarAsync<long>(
             $"SELECT AmountCents FROM {PaymentTable} WHERE Id = @paymentId", new { paymentId }));
     }
@@ -312,10 +313,11 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
             SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
             """, new { key, parcelId, TaxYear });
 
-        await Assert.ThrowsAsync<SqlException>(() =>
+        var ex = await Assert.ThrowsAsync<SqlException>(() =>
             conn.ExecuteAsync($"DELETE FROM {PaymentTable} WHERE Id = @paymentId", new { paymentId }));
 
         Assert.Equal(1, await CountPaymentsAsync(key));
+        Assert.Equal(CustomSqlExceptions.PaymentsAppendOnlyViolation, ex.Number);
     }
 
     [SqlFact]
@@ -325,9 +327,10 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         var paymentId = await PostAsync(CreateService(), Guid.NewGuid(), parcelId, 1_000, DateTime.UtcNow);
 
         await using var conn = await OpenAsync();
-        await Assert.ThrowsAsync<SqlException>(() =>
+        var ex = await Assert.ThrowsAsync<SqlException>(() =>
             conn.ExecuteAsync($"UPDATE {AllocationTable} SET AmountCents = AmountCents + 1 WHERE PaymentId = @paymentId", new { paymentId }));
 
+        Assert.Equal(CustomSqlExceptions.PaymentAllocationsAppendOnlyViolation, ex.Number);
         var allocations = await GetAllocationsAsync(paymentId);
         Assert.Equal(districtIds.Length, allocations.Count);
         Assert.Equal(1_000, allocations.Values.Sum());
@@ -340,9 +343,10 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         var paymentId = await PostAsync(CreateService(), Guid.NewGuid(), parcelId, 1_000, DateTime.UtcNow);
 
         await using var conn = await OpenAsync();
-        await Assert.ThrowsAsync<SqlException>(() =>
+        var ex = await Assert.ThrowsAsync<SqlException>(() =>
             conn.ExecuteAsync($"DELETE FROM {AllocationTable} WHERE PaymentId = @paymentId", new { paymentId }));
 
+        Assert.Equal(CustomSqlExceptions.PaymentAllocationsAppendOnlyViolation, ex.Number);
         Assert.Equal(districtIds.Length, (await GetAllocationsAsync(paymentId)).Count);
     }
 
