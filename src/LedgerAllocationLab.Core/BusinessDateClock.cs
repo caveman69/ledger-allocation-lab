@@ -1,18 +1,23 @@
 namespace LedgerAllocationLab.Core;
 
+public class BusinessDateClockOptions
+{
+    public const string SectionName = "BusinessDateClock";
+    public string IanaTimeZone { get; set; } = string.Empty;
+}
 public sealed class BusinessDateClock
 {
     private readonly TimeZoneInfo _zone;
 
-    public BusinessDateClock(TimeZoneInfo zone)
+    public BusinessDateClock(BusinessDateClockOptions options)
     {
-        ArgumentNullException.ThrowIfNull(zone);
-        _zone = zone;
+        ArgumentNullException.ThrowIfNull(options);
+        _zone = TimeZoneInfo.FindSystemTimeZoneById(options.IanaTimeZone);
     }
 
-    public static BusinessDateClock Phoenix()
+    public static BusinessDateClock GetBusinessDateClock(string ianaTimeZone)
     {
-        return new BusinessDateClock(TimeZoneInfo.FindSystemTimeZoneById("America/Phoenix"));
+        return new BusinessDateClock(new BusinessDateClockOptions { IanaTimeZone = ianaTimeZone });
     }
 
     public DateOnly ToBusinessDate(DateTime utc)

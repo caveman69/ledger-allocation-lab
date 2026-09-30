@@ -1,4 +1,5 @@
 using Dapper;
+using LedgerAllocationLab.Core.Extensions;
 using LedgerAllocationLab.Data.Extensions;
 using LedgerAllocationLab.Data.Services;
 using Microsoft.Data.SqlClient;
@@ -36,6 +37,7 @@ public class LedgerDataTestsBase : IDisposable
             {
                 // Use whatever key LedgerLabDapperDbContext reads.
                 ["LedgerLabDb:ConnectionString"] = connectionString,
+                ["BusinessDateClock:IanaTimeZone"] = "America/Phoenix",
             })
             .Build();
 
@@ -44,8 +46,10 @@ public class LedgerDataTestsBase : IDisposable
             .AddLogging(builder => builder
                 .AddProvider(new XunitLoggerProvider(output))
                 .SetMinimumLevel(LogLevel.Debug))
+            .RegisterLedgerAllocationLabCoreServices()
             .RegisterLedgerAllocationLabDataServices()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+            
     }
 
     protected static async Task<long> PostAsync(IPaymentsDbService service, Guid key, int parcelId, long amountCents, DateTime receivedOnUtc, short taxYear = TaxYear)

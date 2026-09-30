@@ -16,7 +16,7 @@ public interface IPaymentsDbService
 
 }
 
-public class PaymentsDbService(LedgerLabDapperDbContext context, ILogger<PaymentsDbService> logger) : DbServiceBase(context, logger), IPaymentsDbService
+public class PaymentsDbService(LedgerLabDapperDbContext context, ILogger<PaymentsDbService> logger, BusinessDateClock businessDateClock) : DbServiceBase(context, logger), IPaymentsDbService
 {
     private static bool IsIdempotencyKeyViolation(SqlException ex) =>
     (ex.Number == 2627 || ex.Number == 2601)
@@ -45,7 +45,6 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, ILogger<Payment
         logger.LogInformation("Posting payment with idempotencyKey: {IdempotencyKey}, parcelId: {ParcelId}, taxYear: {TaxYear}, amountCents: {AmountCents}, receivedOnUtc: {ReceivedOnUtc}", idempotencyKey, parcelId, taxYear, amountCents, receivedOnUtc);
 
         //get business date from receivedOnUtc
-        var businessDateClock = BusinessDateClock.Phoenix(); //load from configuration
         var received = receivedOnUtc.TruncateToMilliseconds();
         var localBusinessDate = businessDateClock.ToBusinessDate(received);
 

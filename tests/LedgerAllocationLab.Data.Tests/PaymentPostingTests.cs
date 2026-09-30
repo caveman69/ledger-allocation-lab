@@ -102,7 +102,7 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         Assert.Equal(DateOnly.Parse(expectedBusinessDate, CultureInfo.InvariantCulture), storedBusinessDate);
 
         // The row must agree with itself: its date is the business date of its own timestamp.
-        Assert.Equal(BusinessDateClock.Phoenix().ToBusinessDate(storedUtc), storedBusinessDate);
+        Assert.Equal(_provider.GetRequiredService<BusinessDateClock>().ToBusinessDate(storedUtc), storedBusinessDate);
     }
 
     [SqlTheory]
@@ -138,7 +138,7 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         var row = await conn.QuerySingleAsync<(DateTime ReceivedOnUtc, DateTime BusinessDate)>(
             $"SELECT ReceivedOnUtc, BusinessDate FROM {PaymentTable} WHERE IdempotencyKey = @key", new { key });
 
-        var clock = BusinessDateClock.Phoenix();
+        var clock = _provider.GetRequiredService<BusinessDateClock>();
         Assert.Equal(
             clock.ToBusinessDate(DateTime.SpecifyKind(row.ReceivedOnUtc, DateTimeKind.Utc)),
             DateOnly.FromDateTime(row.BusinessDate));

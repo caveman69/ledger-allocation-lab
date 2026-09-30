@@ -1,5 +1,6 @@
 using System.Data;
 using Dapper;
+using LedgerAllocationLab.Core;
 using LedgerAllocationLab.Data.Services;
 using Microsoft.Extensions.DependencyInjection;
 
