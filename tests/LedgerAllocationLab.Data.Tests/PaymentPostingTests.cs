@@ -1,6 +1,7 @@
 using System.Globalization;
 using Dapper;
 using LedgerAllocationLab.Core;
+using LedgerAllocationLab.Data.Exceptions;
 using LedgerAllocationLab.Data.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -181,6 +182,39 @@ public class PaymentPostingTests(LedgerDatabaseMigratorFixture db, ITestOutputHe
         Assert.Equal(first, second);
         Assert.Equal(1, await CountPaymentsAsync(key));
         Assert.Equal(districtIds.Length, (await GetAllocationsAsync(first)).Count);
+    }
+
+    [SqlTheory]
+    [InlineData("amount")]
+    [InlineData("taxYear")]
+    [InlineData("parcel")]
+    public async Task Post_SameKeyDifferentRequest_IsRefusedAndWritesNothing(string changed)
+    {
+        var (parcelId, _) = await SeedParcelAsync(TaxYear, 1m, 1m);
+        var (otherParcelId, _) = await SeedParcelAsync(TaxYear, 1m);
+        var key = Guid.NewGuid();
+        var received = new DateTime(2026, 9, 15, 18, 0, 0, DateTimeKind.Utc);
+
+        var originalId = await PostAsync(CreateService(), key, parcelId, 1_000, received);
+
+        var (replayParcel, replayYear, replayAmount) = changed switch
+        {
+            "amount" => (parcelId, TaxYear, 1_001L),
+            "taxYear" => (parcelId, (short)(TaxYear - 1), 1_000L),
+            "parcel" => (otherParcelId, TaxYear, 1_000L),
+            _ => throw new ArgumentOutOfRangeException(nameof(changed)),
+        };
+
+        await Assert.ThrowsAsync<IdempotencyKeyConflictException>(() =>
+            PostAsync(CreateService(), key, replayParcel, replayAmount, received, replayYear));
+
+        Assert.Equal(1, await CountPaymentsAsync(key));
+        var stored = await CreateService().GetPaymentByIdempotencyKeyAsync(key);
+        Assert.NotNull(stored);
+        Assert.Equal(originalId, stored.Id);
+        Assert.Equal(parcelId, stored.ParcelId);
+        Assert.Equal(TaxYear, stored.TaxYear);
+        Assert.Equal(1_000, stored.AmountCents);
     }
 
     [SqlFact]
