@@ -1,6 +1,6 @@
 namespace LedgerAllocationLab.Data.Models;
 
-public class ParcelDistrictRate : IEntity<long>
+public class ParcelDistrictRate 
 {
     public long Id { get; set; }
     public int ParcelId { get; set; }

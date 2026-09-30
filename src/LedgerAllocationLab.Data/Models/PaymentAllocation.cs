@@ -1,7 +1,6 @@
 namespace LedgerAllocationLab.Data.Models;
 
-[Dapper.Contrib.Extensions.Table("PaymentAllocations")]
-public class PaymentAllocation : IEntity<long>
+public class PaymentAllocation 
 {
     public long Id { get; set; }
 

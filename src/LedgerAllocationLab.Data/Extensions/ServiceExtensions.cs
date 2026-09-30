@@ -20,13 +20,7 @@ public static class ServiceExtensions
 
         // Implementation for registering data services
         return services.AddSingleton<LedgerLabDapperDbContext>()
-            .AddScoped(typeof(IDbStandardService<,>), typeof(DbStandardService<,>))
-            .AddScoped(typeof(IDbReadService<,>), typeof(DbStandardService<,>))
-            .AddScoped(typeof(IDbInsertService<,>), typeof(DbStandardService<,>))
-            .AddScoped(typeof(IDbUpdateService<,>), typeof(DbStandardService<,>))
-            .AddScoped(typeof(IDbDeleteService<,>), typeof(DbStandardService<,>))
             .AddScoped<IPaymentsDbService, PaymentsDbService>()
-            .AddScoped<IParcelDistrictRateService, ParcelDistrictRateService>()
             .AddScoped<IReportsDbService, ReportsDbService>();
     }
 }

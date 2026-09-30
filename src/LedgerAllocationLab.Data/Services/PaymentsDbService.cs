@@ -1,5 +1,5 @@
+using System.Data.Common;
 using Dapper;
-using Dapper.Contrib.Extensions;
 using LedgerAllocationLab.Core;
 using LedgerAllocationLab.Data.Exceptions;
 using LedgerAllocationLab.Data.Extensions;
@@ -16,14 +16,11 @@ public interface IPaymentsDbService
 
 }
 
-public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<Payment, long> baseDbService, IParcelDistrictRateService parcelDistrictRateService, ILogger<PaymentsDbService> logger) : DbServiceBase(context, logger), IPaymentsDbService
+public class PaymentsDbService(LedgerLabDapperDbContext context, ILogger<PaymentsDbService> logger) : DbServiceBase(context, logger), IPaymentsDbService
 {
     private static bool IsIdempotencyKeyViolation(SqlException ex) =>
     (ex.Number == 2627 || ex.Number == 2601)
     && ex.Message.Contains("UQ_Payment_IdempotencyKey", StringComparison.Ordinal);
-
-    public Task<IEnumerable<Payment>> GetAllAsync() => baseDbService.GetAllAsync();
-    public Task<Payment?> GetByIdAsync(long id) => baseDbService.GetByIdAsync(id);
 
     public async Task<Payment?> GetPaymentByIdempotencyKeyAsync(Guid idempotencyKey)
     {
@@ -64,29 +61,36 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<
         };
 
         //open transaction
-        using var insertConn = context.CreateConnection();
-        await insertConn.OpenAsync();
-        using var transaction = await insertConn.BeginTransactionAsync();
+        using var conn = context.CreateConnection();
+        await conn.OpenAsync();
+        using var tx = await conn.BeginTransactionAsync();
 
         try
-        { 
+        {
             //insert payment
-            var result = await insertConn.InsertAsync(payment, transaction);
+            const string insertPayment = """
+                INSERT INTO dbo.Payments (IdempotencyKey, ParcelId, TaxYear, AmountCents, ReceivedOnUtc, BusinessDate) 
+                OUTPUT INSERTED.Id
+                VALUES (@IdempotencyKey, @ParcelId, @TaxYear, @AmountCents, @ReceivedOnUtc, @BusinessDate); 
+                """;
+            payment.Id = await conn.ExecuteScalarAsync<long>(insertPayment, payment, tx);
 
-            //create the paymentallocations
-            var allocations = await AllocatePayment(payment);
+            var rates = await LoadRatesAsync(conn, tx, parcelId, taxYear);
+            var split = Allocator.Allocate(amountCents, rates.Select(r => (r.DistrictId, r.Rate)).ToList());
 
-            //insert payment allocations
-            //Dapper does these one at a time... it's okay for this example,
-            //but for production, consider a bulk insert library like Dapper Plus or EF Core BulkExtensions
-            var allocs = await insertConn.InsertAsync(allocations, transaction);
+            const string insertAllocation = """
+                INSERT INTO dbo.PaymentAllocations (PaymentId, DistrictId, AmountCents)
+                VALUES (@PaymentId, @DistrictId, @AmountCents); 
+                """;
+            await conn.ExecuteAsync(insertAllocation,
+                split.Select(s => new { PaymentId = payment.Id, DistrictId = s.Key, AmountCents = s.Cents }), tx);
 
             //commit transaction
-            await transaction.CommitAsync();
+            await tx.CommitAsync();
         } catch (SqlException sqlEx) when (IsIdempotencyKeyViolation(sqlEx))
         {
             // Handle idempotency violation
-            await transaction.RollbackAsync();
+            await tx.RollbackAsync();
 
             var existing = await GetPaymentByIdempotencyKeyAsync(idempotencyKey);
             if (existing is null)
@@ -105,31 +109,23 @@ public class PaymentsDbService(LedgerLabDapperDbContext context, IDbReadService<
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await tx.RollbackAsync();
             logger.LogError(ex, "Error occurred while posting payment");
             throw;
         }
         return payment;
     }
 
-    private async Task<List<PaymentAllocation>> AllocatePayment(Payment payment)
+    private static async Task<IReadOnlyList<(int DistrictId, decimal Rate)>> LoadRatesAsync(
+    DbConnection conn, DbTransaction tx, int parcelId, short taxYear)
     {
-        // Implementation for allocating payment to districts
-        //get all parceldistrictrates for the parcel and tax year
-        var parcelDistrictRates = await parcelDistrictRateService.GetParcelDistrictRatesForTaxYear(payment.ParcelId, payment.TaxYear);
-        //allocate
-        var districtAllocations = Allocator.Allocate(payment.AmountCents, parcelDistrictRates.Select(r=>(r.DistrictId, r.Rate)).ToList());
-
-        var allocations = new List<PaymentAllocation>();
-        foreach (var alloc in districtAllocations)
-        {
-            allocations.Add(new PaymentAllocation
-            {
-                PaymentId = payment.Id,
-                DistrictId = alloc.Key,
-                AmountCents = alloc.Cents
-            });
-        }
-        return allocations;
-    }   
+        const string sql = """
+        SELECT DistrictId, Rate
+        FROM dbo.ParcelDistrictRates
+        WHERE ParcelId = @parcelId AND TaxYear = @taxYear
+        ORDER BY DistrictId;
+        """;
+        var rows = await conn.QueryAsync<(int DistrictId, decimal Rate)>(sql, new { parcelId, taxYear }, tx);
+        return rows.ToList();
+    }
 }
